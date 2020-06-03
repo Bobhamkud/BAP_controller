@@ -1,3 +1,4 @@
+close all
 %% Initializations %%
 dt = 100e-3;                              % 100 ms sample time
 Tfinal = 200;                             % simulation will last 200 s
@@ -17,10 +18,22 @@ t_sp4 = 160;                               % fourth setpoint at 160 seconds
 
 
 %% setting up input vector u containing the setpoints %%
-u(0:round(t_sp2/dt)) = sp_1;                       % setpoint 1, 0<t<t_sp2
-u(round(t_sp2/dt)+1:round(t_sp3/dt)) = sp_2;       % setpoint 2, t_sp2<t<t_sp3
-u(round(t_sp3/dt)+1:round(t_sp4/dt)) = sp_3;       % setpoint 3, t_sp3<t<t_sp4
-u(round(t_sp4/dt)+1:end) = sp_4;                   % setpoint 4, t_sp4<t<Tfinal
+u(1:ceil(t_sp2/dt)) = sp_1;                       % setpoint 1, 0<t<t_sp2
+u(ceil(t_sp2/dt)+1:ceil(t_sp3/dt)) = sp_2;       % setpoint 2, t_sp2<t<t_sp3
+u(ceil(t_sp3/dt)+1:ceil(t_sp4/dt)) = sp_3;       % setpoint 3, t_sp3<t<t_sp4
+u(ceil(t_sp4/dt)+1:end) = sp_4;                   % setpoint 4, t_sp4<t<Tfinal
+
+%% PI controller %%
+k_p = 2;
+k_i = 0.5;
+H_pi = tf([k_p k_i],[1 0]);
+
+%% Total transfer %%
+H_tot = (H_wf*(1+H_pi)) / (1+H_pi*H_wf);
 
 %% Simulate the behaviour %%
-lsim(H_wf,u,t)
+hold on
+%lsim(H_wf,u,t)
+result = lsim(H_tot,u,t);
+ylim([0 40e6])
+xlim([0 0.1])
