@@ -1,8 +1,9 @@
 close all
+clear
 %% Initializations %%
 dt = 100e-3;                              % 100 ms sample time
 Tfinal = 200;                             % simulation will last 200 s
-N = 3;                                   % number of wind turbines
+N = 3;                                    % number of wind turbines
 dt_DF = 1;                                % 1 s time step distribution factor DF
 
 t = 0:dt:Tfinal;                          % time vector
@@ -31,10 +32,10 @@ k_i = 0.3;
 H_pi = tf([k_p k_i],[1 0]);
 
 %% Transfer functions, by default the time unit is seconds %%
-H_wf = tf([6.075 145],[1 29.17 145]);          % transfer function wind farm
+H_wf = tf([6.075 145],[1 29.17 145]);          % transfer function wind farm (from paper)
 
 H_wt_1 = tf([10.01 15.75],[1 11.64 15.75]);    % transfer function wind turbine 1 (from paper)
-H_wt_2 = tf([8.47 12.21],[2 10.7 11]);         % transfer function wind turbine 2
+H_wt_2 = tf([9 8],[2 10.7 11]);                % transfer function wind turbine 2
 H_wt_3 = tf([11.11 17.99],[3 14.44 18.89]);    % transfer function wind turbine 3
 
 H_agg = [H_wt_1/(1 - H_wt_1);H_wt_2/(1 - H_wt_2);H_wt_3/(1 - H_wt_3)]; % vector used for calculation total transfer
@@ -45,25 +46,50 @@ H_tot_wf = (H_wf*(1+H_pi)) / (1+H_pi*H_wf);    % total transfer function using H
 P_a(1:end) = 10e6*[30;40;50]; % initialize available power
 P(1:end) = 10e6*[15;15;15];   % intialize currently produced active power
 y1_tot = zeros(1, length(t)); % initialize output vector
-a_p = 3;                      % initialize a_p
-x_1 = zeros(1,26);            % intialize vector containing states
+a_p = 3*10e12;                % initialize a_p
+x0 = zeros(1,26);             % intialize vector containing states
+x1 = zeros(1,3);              % intialize vector containing states
+x2 = zeros(1,3);              % intialize vector containing states
+x3 = zeros(1,3);              % intialize vector containing states
+t_end = 0;                    % initialize end time step
 
 for i=0:dt_DF:Tfinal
     
     DF = calc_DF( P, P_a, a_p );                       % calculate distribution factors
     H_agg_d = DF * H_agg;                              % calculate transfer fuction of wind turbines combined
     H_tot_agg = (H_pi*H_agg_d) /(1+H_pi*H_agg_d);      % total transfer function farm using H_agg
-    
-    t_begin = ceil((i*dt_DF)/dt) + 1;                         % index corresponding to beginning of time interval
-    u_begin = ceil((i*dt_DF)/dt) + 1;                         % index corresponding to beginning of setpoint interval
-    t_end = t_begin + ceil(dt_DF/dt);                         % index corresponding to end of time interval 
-    u_end = u_begin + ceil(dt_DF/dt);                         % index corresponding to end of setpoint interval
-    
-    [y1,t1,x1]=lsim(ss(H_tot_agg),'g',u(u_begin:u_end),t(t_begin:t_end));   % solve for time interval
-    y1_tot(t_begin:t_end) = y1;                                             % update output vector
-    P = P(end,:);                                                           % DF based on produced active power
-                                                                            % at the end of the interval
+    %lsim(ss(H_tot_agg),'g',u,t);
+    %pole(H_tot_agg)
+    %figure(2)
+    %pzmap(H_tot_agg)
+    if t_end >= (ceil(Tfinal/dt)+1) 
+        break
+    else
+        t_begin = ceil((i*dt_DF)/dt) + 1;                         % index corresponding to beginning of time interval
+        u_begin = ceil((i*dt_DF)/dt) + 1;                         % index corresponding to beginning of setpoint interval
+        t_end = t_begin + ceil(dt_DF/dt);                         % index corresponding to end of time interval 
+        u_end = u_begin + ceil(dt_DF/dt);                         % index corresponding to end of setpoint interval
+    end
+
+    [y0,t0,x0]=lsim(ss(H_tot_agg),'g',u(u_begin:u_end),t(t_begin:t_end)-t(t_begin),x0(end,:)); % solve whole farm for time interval
+    if y0(end,end)==0
+        pause
+    end
+    % response per turbine including PI % 
+    delta_ref = u(u_begin:u_end) - y0;
+    H_tb_PI_1 = H_wt_1*H_pi*DF(1);
+    H_tb_PI_2 = H_wt_2*H_pi*DF(2);
+    H_tb_PI_3 = H_wt_3*H_pi*DF(3);
+    [wt_1_PI_out,t1,x1] = lsim(ss(H_tb_PI_1),delta_ref,t(t_begin:t_end)-t(t_begin),x1(end,:));
+    [wt_2_PI_out,t2,x2] = lsim(ss(H_tb_PI_2),delta_ref,t(t_begin:t_end)-t(t_begin),x2(end,:));
+    [wt_3_PI_out,t3,x3] = lsim(ss(H_tb_PI_3),delta_ref,t(t_begin:t_end)-t(t_begin),x3(end,:));
+
+    y1_tot(ceil(t_begin):ceil(t_end)) = y0;                                % update output vector
+    P(1:end) = [wt_1_PI_out(end);wt_2_PI_out(end);wt_3_PI_out(end)];       % DF based on produced active power
+                                                                           % at the end of the interval
+                                                                            
 end
+
 plot(t, u)      % plot setpoint values as function of time
 hold on
 plot(t, y1_tot) % plot active power output as function of time
