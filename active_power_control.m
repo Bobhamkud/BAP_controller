@@ -48,9 +48,9 @@ P(1:end) = 10e6*[15;15;15];   % intialize currently produced active power
 y1_tot = zeros(1, length(t)); % initialize output vector
 a_p = 3*10e12;                % initialize a_p
 x0 = zeros(1,26);             % intialize vector containing states
-x1 = zeros(1,3);              % intialize vector containing states
-x2 = zeros(1,3);              % intialize vector containing states
-x3 = zeros(1,3);              % intialize vector containing states
+x1 = zeros(1,5);              % intialize vector containing states
+x2 = zeros(1,5);              % intialize vector containing states
+x3 = zeros(1,5);              % intialize vector containing states
 t_end = 0;                    % initialize end time step
 
 for i=0:dt_DF:Tfinal
@@ -77,9 +77,9 @@ for i=0:dt_DF:Tfinal
     end
     % response per turbine including PI % 
     delta_ref = u(u_begin:u_end) - y0;
-    H_tb_PI_1 = H_wt_1*H_pi*DF(1);
-    H_tb_PI_2 = H_wt_2*H_pi*DF(2);
-    H_tb_PI_3 = H_wt_3*H_pi*DF(3);
+    H_tb_PI_1 = (H_wt_1/(1-H_wt_1))*H_pi*DF(1);
+    H_tb_PI_2 = (H_wt_2/(1-H_wt_2))*H_pi*DF(2);
+    H_tb_PI_3 = (H_wt_3/(1-H_wt_3))*H_pi*DF(3);
     [wt_1_PI_out,t1,x1] = lsim(ss(H_tb_PI_1),delta_ref,t(t_begin:t_end)-t(t_begin),x1(end,:));
     [wt_2_PI_out,t2,x2] = lsim(ss(H_tb_PI_2),delta_ref,t(t_begin:t_end)-t(t_begin),x2(end,:));
     [wt_3_PI_out,t3,x3] = lsim(ss(H_tb_PI_3),delta_ref,t(t_begin:t_end)-t(t_begin),x3(end,:));
