@@ -31,16 +31,27 @@ u(ceil(t_sp4/dt)+1:end) = sp_4;                  % setpoint 4, t_sp4<t<Tfinal
 s = tf('s'); % laplace variable s
 
 % PI Controller %
+<<<<<<< Updated upstream
 k_p = 2;
 k_i = 0.3;
+=======
+k_p = 17;
+k_i = 11;
+z = k_p/k_i;
+>>>>>>> Stashed changes
 C = pidstd(k_p,k_p/k_i);
 C.Inputname = 'e'; 
 C.OutputName = 'v';
 
 % Wind turbines %
 H_wt_1 = tf([10.01 15.75],[1 11.64 15.75]);    % transfer function wind turbine 1 (from paper)
+<<<<<<< Updated upstream
 H_wt_2 = tf([9 8],[2 10.7 11]);                % transfer function wind turbine 2
 H_wt_3 = tf([11.11 17.99],[3 14.44 18.89]);    % transfer function wind turbine 3
+=======
+H_wt_2 = tf([10.01 15.75],[1 11.64 15.75]);    % transfer function wind turbine 2
+H_wt_3 = tf([10.01 15.75],[1 11.64 15.75]);    % transfer function wind turbine 3
+>>>>>>> Stashed changes
 L_wt_1 = H_wt_1/(1-H_wt_1);                    % transfer function wind turbine 1 including feedback
 L_wt_2 = H_wt_2/(1-H_wt_2);                    % transfer function wind turbine 2 including feedback
 L_wt_3 = H_wt_3/(1-H_wt_3);                    % transfer function wind turbine 3 including feedback
@@ -83,7 +94,16 @@ x3 = zeros(1,13);             % intialize vector containing states
 t_end = 0;                    % initialize end time step
 u_end = 0;                    % initialize end input step
 
+<<<<<<< Updated upstream
 for i=0:dt_DF:Tfinal
+=======
+ytb1_tot = zeros(1, length(t)); % initialize output vector turbine 1
+ytb2_tot = zeros(1, length(t)); % initialize output vector turbine 2
+ytb3_tot = zeros(1, length(t)); % initialize output vector turbine 3
+
+for i=0:dt_DF:Tfinal
+
+>>>>>>> Stashed changes
     
     DF = calc_DF( P, P_a, a_p ); % calculate distribution factors
     blk1.Gain.Value = DF(1);
@@ -119,16 +139,27 @@ for i=0:dt_DF:Tfinal
     [wt_1_PI_out,~,x1] = lsim(ss(Ttb1),u(u_begin:u_end),t(t_begin:t_end)-t(t_begin),x1(end,:));
     [wt_2_PI_out,~,x2] = lsim(ss(Ttb2),u(u_begin:u_end),t(t_begin:t_end)-t(t_begin),x2(end,:));
     [wt_3_PI_out,~,x3] = lsim(ss(Ttb3),u(u_begin:u_end),t(t_begin:t_end)-t(t_begin),x3(end,:));
+<<<<<<< Updated upstream
 DF
     y1_tot(t_begin:t_end) = y0;                                           % update output vector
     %P(1:end) = [wt_1_PI_out(end);wt_2_PI_out(end);wt_3_PI_out(end)];     % DF based on produced active power
                                                                           % at the end of the interval
+=======
+    DF
+    y1_tot(t_begin:t_end) = y0;                                          % update output vector
+    ytb1_tot(t_begin:t_end) = wt_1_PI_out; 
+    ytb1_tot(t_begin:t_end) = wt_2_PI_out; 
+    ytb1_tot(t_begin:t_end) = wt_3_PI_out; 
+    P(1:end) = [wt_1_PI_out(end);wt_2_PI_out(end);wt_3_PI_out(end)];     % DF based on produced active power
+                                                                         % at the end of the interval
+>>>>>>> Stashed changes
                                                                             
 end
 
 plot(t, u)      % plot setpoint values as function of time
 hold on
 plot(t, y1_tot) % plot active power output as function of time
+<<<<<<< Updated upstream
 % figure(2)
 % [y1,t1,x1] = lsim(ss(Twf),u,t);
 % [y2,t2,x2] = lsim(ss(Ttb1),u,t);
@@ -143,6 +174,35 @@ plot(t, y1_tot) % plot active power output as function of time
 % plot(t,y4)
 % figure(6)
 % plot(t,y2)
+=======
+figure(2)
+plot(t,u)
+hold on
+plot(t, ytb1_tot)
+figure(3)
+plot(t,u)
+hold on
+plot(t, ytb1_tot)
+figure(4)
+plot(t,u)
+hold on
+plot(t, ytb1_tot)
+
+%  figure(2)
+%  [y1,t1,x1] = lsim(ss(Twf),u,t);
+%  [y2,t2,x2] = lsim(ss(Ttb1),u,t);
+%  [y3,t3,x3] = lsim(ss(Ttb2),u,t);
+%  [y4,t4,x4] = lsim(ss(Ttb3),u,t);
+%  plot(t,y1)
+%  figure(3)
+%  plot(t,y2+y3+y4)
+%  figure(4)
+%  plot(t,y3)
+%  figure(5)
+%  plot(t,y4)
+%  figure(6)
+%  plot(t,y2)
+>>>>>>> Stashed changes
 %% Distribution factor %%
 function [ DF ] = calc_DF( P, P_a, a_p )
 s = ((P_a - P) .* (P_a.^2)) ./ (P_a.^2 + a_p);
