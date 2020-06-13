@@ -15,9 +15,10 @@ function [Ptot,Qtot] = compute_pq_pvg(irradiance,Nstrings)
         P = Prated;
     end
     Ptot = P * Nmodules_per_string* efficiency_inverter * 1e-6; %P in MW per string   
-    Qtot = Qrange * Ptot;                                          %Q in MVAr per string
-    
+    Qtot = Qrange * Ptot;                                       %Q in MVAr per string
+    Qtot(1, 1:length(Ptot)) = Qrange * max(Ptot);
     %%repeat for N strings
-    Ptot = repmat(Ptot,1,Nstrings);
-    Qtot = repmat(Qtot,1,Nstrings);
+    Ptot = repmat(Ptot,Nstrings,1);
+    Qtot = repmat(Qtot,Nstrings,1);
+    
 end
