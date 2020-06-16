@@ -2,7 +2,7 @@ clear
 close all
 %% Initializations %%
 
-dt = 200e-3;                                    % 10 ms sample time
+dt = 100e-3;                                    % 10 ms sample time
 Tfinal = 200;                                   % simulation will last 200 s
 Ntb = 13;                                       % number of wind turbine strings
 Npv = 4;                                        % number of PV module strings
@@ -42,7 +42,7 @@ P_sp_pcc(idx_begin:end) = setpoint_values(end);
 
 v_profile = zeros(1,length(t));
 for i =1:length(v_profile)
-v_profile(i) = normrnd(15,1);
+v_profile(i) = normrnd(20,0.1);
 end
 %v_profile(1:end) = 25;
 [P_a_string(:,1:Ntb),Qwtg_string_profile] = compute_pq_wtg(v_profile);
