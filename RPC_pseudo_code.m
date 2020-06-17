@@ -13,8 +13,8 @@ Ntb = 13;                                 % number of wind turbine strings
 Npv = 4;                                  % number of PV module strings
 t = 0:dt:Tfinal;                          % time vector
 Q_sp = zeros(length(t), 1);               % initialize input vector with Q set points
-k_p = 1;                                  % proportional gain VSPI controller
-T_i = 0.7;                                % integral time constant VSPI controller
+k_p = 0.9;                                % proportional gain VSPI controller
+T_i = 2;                                  % integral time constant VSPI controller
 beta = 2;                                 % parameter beta for VSPI
 sigma = 2;                                % parameter sigma for VSPI
 error = zeros(length(t),1);               % difference between Q set point TSO and Q delivered by PPM
@@ -105,7 +105,8 @@ end
 
 % load in P of each string at every time instant
 load('agreed_profiles.mat') % load wind and solar profiles
-[ P_current_string ] = active_power_func( windspeed, irradiance );
+load('P_current_RPC.mat')
+%[ P_current_string ] = active_power_func( windspeed, irradiance );
 APC = P_current_string.';
 
 % convert outcome from previous steps into Qavailable for each string at every
@@ -130,7 +131,7 @@ system.gen(2:5,[3,4,5]) = [(Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+
 current_values = runpf(system, Run_pf_setting);
 Q_current_string(1,1:Ntb) = current_values.gen(6:18,3);
 Q_current_string(1,Ntb+1:end) = current_values.gen(2:5,3);
-Q_pcc(1) = -1 * current_values.gen(1,3);
+Q_pcc(1) = -1*current_values.gen(1,3);
 %% Iterate over time %%
 
 z = dec2bin(2^Ntb-1:-1:0)-'0'; % create matrix with each row one the possible
@@ -235,10 +236,10 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
     current_values = runpf(system, Run_pf_setting);
     Q_current_string(j+1,1:Ntb) = current_values.gen(6:18,3);
     Q_current_string(j+1,Ntb+1:end) = current_values.gen(2:5,3);
-    Q_pcc(j+1) = -1 * current_values.gen(1,3);
+    Q_pcc(j+1) = -1*current_values.gen(1,3);
 end
 
-plot(t,Q_pcc)
+plot(t,Q_pcc(1:end-1))
 hold on
 plot(t,Q_sp_pcc)
     
