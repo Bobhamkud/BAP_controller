@@ -8,12 +8,12 @@ close all
 %% Initializations %%
 
 dt = 200e-3;                              % 200 ms sample time
-Tfinal = 100;                             % simulation will last 300 s
+Tfinal = 10;                             % simulation will last 300 s
 Ntb = 13;                                 % number of wind turbine strings
 Npv = 4;                                  % number of PV module strings
 t = 0:dt:Tfinal;                          % time vector
 Q_sp = zeros(length(t), 1);               % initialize input vector with Q set points
-k_p = 3;                                  % proportional gain VSPI controller
+k_p = 1;                                  % proportional gain VSPI controller
 T_i = 0.7;                                % integral time constant VSPI controller
 beta = 2;                                 % parameter beta for VSPI
 sigma = 2;                                % parameter sigma for VSPI
@@ -125,13 +125,25 @@ end
 %% Run initial power flow %%
 
 system = loadcase('system_17');
-system.gen(6:end,[3,4,5]) = [(Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb,1)).' (Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb,1)).' (Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb,1)).'];
-system.gen(2:5,[2,9,10]) = [(Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).' (Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).' (Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).'];
+system.gen(6:end,[3,4,5]) = [(Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb)).' (Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb)).' (Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb)).'];
+system.gen(2:5,[3,4,5]) = [(Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).' (Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).' (Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).'];
 current_values = runpf(system, Run_pf_setting);
 Q_current_string(1,1:Ntb) = current_values.gen(6:18,3);
 Q_current_string(1,Ntb+1:end) = current_values.gen(2:5,3);
 Q_pcc(1) = -1 * current_values.gen(1,3);
 %% Iterate over time %%
+
+z = dec2bin(2^Ntb-1:-1:0)-'0'; % create matrix with each row one the possible
+                                       % combinations of 0 and 1 for Ntb
+                                       % amount of number
+% turn each 0 into -1 %                               
+for l = 1:length(z(1,:))
+    for k = 1:length(z(:,1))
+        if z(k,l) == 0
+            z(k,l) = -1;
+        end
+    end
+end
 
 for j = 1:length(t)
     j
@@ -170,18 +182,6 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
     %--- determine set points ---%
     if Opti_switch == 0
         
-        z = dec2bin(2^Ntb-1:-1:0)-'0'; % create matrix with each row one the possible
-                                       % combinations of 0 and 1 for Ntb
-                                       % amount of number
-        % turn each 0 into -1 %                               
-        for l = 1:length(z(1,:))
-            for k = 1:length(z(:,1))
-                if z(k,l) == 0
-                    z(k,l) = -1;
-                end
-            end
-        end
-        
         % create a matrix with all possible combinations of the signs %
         % of the reactive power produced %
         optQs = zeros(length(z(:,1)),Ntb+Npv);
@@ -195,7 +195,7 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
         for k = 1:length(optQs(:,1))
             for i = 1:length(distribution)
                 s = s + 1;
-                Q_options(s,1) = abs( u(j) - sum(distribution(i)*optQs(k,:)) );
+                Q_options(s,1) = abs( Q_big(j) - sum(distribution(i)*optQs(k,:)) );
                 Q_options(s,2) = k;
                 Q_options(s,3) = i;
             end
@@ -206,7 +206,7 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
         ibest = Q_options(idxBest,3);
         
         Q_sp_strings(j,:) = distribution(ibest)*optQs(kbest,:); 
-        
+        sum(Q_sp_strings(j,:))
         
     % Dat verdelen over strings adhv DF (Let op Q_a_i):
 %     - regels bedenken verdelen en bij Capabillty limits
@@ -231,7 +231,7 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
     
     %--- apply set points ---%
     system.gen(6:end,[3,4,5]) = [Q_sp_strings(j,1:Ntb).' Q_sp_strings(j,1:Ntb).' Q_available_m(j,1:Ntb).'];
-    system.gen(2:5,[2,9,10]) = [Q_sp_strings(j,Ntb+1:end).' Q_sp_strings(j,Ntb+1:end).' Q_available_m(j,Ntb+1:end).'];
+    system.gen(2:5,[3,4,5]) = [Q_sp_strings(j,Ntb+1:end).' Q_sp_strings(j,Ntb+1:end).' Q_available_m(j,Ntb+1:end).'];
     current_values = runpf(system, Run_pf_setting);
     Q_current_string(j+1,1:Ntb) = current_values.gen(6:18,3);
     Q_current_string(j+1,Ntb+1:end) = current_values.gen(2:5,3);
