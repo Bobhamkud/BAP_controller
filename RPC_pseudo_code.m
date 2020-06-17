@@ -8,7 +8,7 @@ close all
 %% Initializations %%
 
 dt = 200e-3;                              % 200 ms sample time
-Tfinal = 300;                             % simulation will last 300 s
+Tfinal = 100;                             % simulation will last 300 s
 Ntb = 13;                                 % number of wind turbine strings
 Npv = 4;                                  % number of PV module strings
 t = 0:dt:Tfinal;                          % time vector
@@ -127,37 +127,38 @@ end
 system = loadcase('system_17');
 system.gen(6:end,[3,4,5]) = [(Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb,1)).' (Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb,1)).' (Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb,1)).'];
 system.gen(2:5,[2,9,10]) = [(Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).' (Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).' (Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).'];
-current_values = runpf(system);
-Q_current_string(1:Ntb,1) = current_values.gen(6:18,3);
-Q_current_string(Ntb+1:end,1) = current_values.gen(2:5,3);
+current_values = runpf(system, Run_pf_setting);
+Q_current_string(1,1:Ntb) = current_values.gen(6:18,3);
+Q_current_string(1,Ntb+1:end) = current_values.gen(2:5,3);
 Q_pcc(1) = -1 * current_values.gen(1,3);
 %% Iterate over time %%
 
 for j = 1:length(t)
+    j
  
 % (depends on mode)if the Reactive Power Exchange at the PCC or the Voltage Deviation at the PCC exceeds the predefined 
 % Disturbance Threshold, the Reactive Power Support of the PPM must be maintained for at least 15 minutes.
     
     % detect set point change %
     if j > 1
-        if Q_sp_pcc(j) ~= Q_sp_pcc(j-1)
+        if Q_sp_pcc(j) ~= Q_pcc(j-1)
             Opti_new = false;
         end
     end
     
     % detect change in optimization set point after set point change %
-    if Opti_new == false && Optimization_setpoint(j,:) ~= Optimization_setpoint(j-1,:)
+    if Opti_new == false & Optimization_setpoint(j,:) ~= Optimization_setpoint(j-1,:)
        Opti_new = true;
     end
 
-error(j) =  Q_sp_pcc(j) - Qppm(j);
+error(j) =  Q_sp_pcc(j) - Q_pcc(j);
     
-u(j) = k_p*( error(j) + trapz(t, (error/T_i)*exp(-(error.^2)./(2*beta^(2)*sigma^2)) ) ); 
+u(j) = k_p*( error(j) + trapz(t, (error/T_i).*exp(-(error.^2)./(2*beta^(2)*sigma^2)) ) ); 
 
 Q_big(j) = u(j) + Q_sp_pcc(j);
 
     % Check if set point is reached and stable %
-    if error(j) < threshold
+    if error(j) < threshold_opt
         count = count+1;
             if count == 100
                 Opti_switch = TRUE; % implement optimazation setpoints
@@ -183,9 +184,9 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
         
         % create a matrix with all possible combinations of the signs %
         % of the reactive power produced %
-        optQs = zeros(length(z(:,1),Ntb+Npv));
+        optQs = zeros(length(z(:,1)),Ntb+Npv);
         for i = 1:length(z(:,1))
-            optQs(i,1) = [(z(i,:).*Q_available_m(j,1:Ntb)) Q_available_m(j,Ntb+1:end)];
+            optQs(i,:) = [(z(i,:).*Q_available_m(j,1:Ntb)) Q_available_m(j,Ntb+1:end)];
         end
         
         % determine best distribution factor and best combination of signs %
@@ -200,9 +201,9 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
             end
         end
         
-        [valBest, idxBest] = min(options(:,1));
-        kbest = options(idxBest,2);
-        ibest = options(idxBest,3);
+        [valBest, idxBest] = min(Q_options(:,1));
+        kbest = Q_options(idxBest,2);
+        ibest = Q_options(idxBest,3);
         
         Q_sp_strings(j,:) = distribution(ibest)*optQs(kbest,:); 
         
