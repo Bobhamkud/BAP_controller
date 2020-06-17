@@ -2,8 +2,8 @@ clear
 close all
 %% Initializations %%
 
-dt = 1000e-3;                                   % 10 ms sample time
-Tfinal = 18000;                                 % simulation will last 200 s
+dt = 200e-3;                                    % 10 ms sample time
+Tfinal = 3600;                                  % simulation will last 18000 s
 Ntb = 13;                                       % number of wind turbine strings
 Npv = 4;                                        % number of PV module strings
 t = 0:dt:Tfinal;                                % time vector
@@ -24,11 +24,11 @@ load('agreed_profiles.mat')                         % load wind and solar profil
 sp_1 = 70;                               % first set point 70 MW
 t_sp1 = 0;                               % first set point at 0 seconds
 sp_2 = 70;                               % second set point 70 MW
-t_sp2 = 4500;                            % second set point at 4500 seconds
+t_sp2 = 900;                             % second set point at 4500 seconds
 sp_3 = 110;                              % third set point 110 MW
-t_sp3 = 9000;                            % third set point at 9000 seconds
-sp_4 = 55;                               % fourth set point 55 MW
-t_sp4 = 13500;                           % fourth set point at 13500 seconds
+t_sp3 = 1800;                            % third set point at 9000 seconds
+sp_4 = 155;                              % fourth set point 55 MW
+t_sp4 = 2700;                            % fourth set point at 13500 seconds
 
 setpoint_values = [sp_1 sp_2 sp_3 sp_4];    % vector containing set points
 setpoint_times = [t_sp1 t_sp2 t_sp3 t_sp4]; % vector containing set point times
@@ -65,8 +65,8 @@ P_a_string(:,Ntb+1:end) = P_a_pv.';
 
 % run initial powerflow % 
 system = loadcase('system_17');
-system.gen(6:end,[2,9,10]) = [(P_a_string(1,1:Ntb)-5).' (P_a_string(1,1:Ntb)-5).' (P_a_string(1,1:Ntb)-5).'];
-system.gen(2:5,[2,9,10]) = [(P_a_string(1,Ntb+1:end)-5).' (P_a_string(1,Ntb+1:end)-5).' (P_a_string(1,Ntb+1:end)-5).'];
+system.gen(6:end,[2,9,10]) = [(P_a_string(1,1:Ntb)-2).' (P_a_string(1,1:Ntb)-2).' (P_a_string(1,1:Ntb)-2).'];
+system.gen(2:5,[2,9,10]) = [(P_a_string(1,Ntb+1:end)-2).' (P_a_string(1,Ntb+1:end)-2).' (P_a_string(1,Ntb+1:end)-2).'];
 current_values = runpf(system, Run_pf_setting);
 P_current_string(1,1:Ntb) = current_values.gen(6:18,2);
 P_current_string(1,Ntb+1:end) = current_values.gen(2:5,2);
@@ -214,7 +214,9 @@ end
 % Plot set point response % 
 plot(t,P_pcc)
 hold on
-plot(t,P_sp_pcc,t,P_a_tot, t, P_a_wind)
+plot(t,P_sp_pcc)
+plot(t,P_a_tot, t, P_a_wind)
+xlim([t(1) t(end)])
 title('Active power response for high wind profile', 'FontSize', 24)
 xlabel('Time [s]', 'FontSize', 24)
 ylabel('Power [MW]', 'FontSize', 24)
@@ -224,6 +226,7 @@ legend.FontSize = 24;
 % Plot wind profies % 
 figure(2)
 plot(t,v_profile)
+xlim([t(1) t(end)])
 title('Wind profile', 'FontSize', 24)
 xlabel('Time [s]', 'FontSize', 24)
 ylabel('Wind speed [m/s]', 'FontSize', 24)
@@ -231,6 +234,7 @@ ylabel('Wind speed [m/s]', 'FontSize', 24)
 % Plot irradiance profile %
 figure(3)
 plot(t,solar_profile)
+xlim([t(1) t(end)])
 title('Irradiance profile', 'FontSize', 24)
 xlabel('Time [s]', 'FontSize', 24)
 ylabel('Irradiance [W/m^{2}]', 'FontSize', 24)
@@ -238,6 +242,7 @@ figure(4)
 
 % Plot case occurences %
 plot(t,case_log*100)
+xlim([t(1) t(end)])
 title('Cases that occur during simulation', 'FontSize', 24)
 xlabel('Time [s]', 'FontSize', 24)
 ylabel('Case nuber times 100', 'FontSize', 24)
@@ -250,6 +255,7 @@ plot(t,P_sp_string(:,5),t,P_sp_string(:,6),t,P_sp_string(:,7),t,P_sp_string(:,8)
 plot(t,P_sp_string(:,9),t,P_sp_string(:,10),t,P_sp_string(:,11))
 plot(t,P_sp_string(:,12),t,P_sp_string(:,13),t,P_sp_string(:,14))
 plot(t,P_sp_string(:,15),t,P_sp_string(:,16),t,P_sp_string(:,17))
+xlim([t(1) t(end)])
 title('Individual set points for strings', 'FontSize', 24)
 xlabel('Time [s]', 'FontSize', 24)
 ylabel('Power [MW]', 'FontSize', 24)
