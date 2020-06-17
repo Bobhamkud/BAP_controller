@@ -5,7 +5,7 @@
 % Opti_switch = FALSE
 clear
 close all
-%% Initializations profiles %%
+%% Initializations %%
 
 dt = 200e-3;                              % 200 ms sample time
 Tfinal = 300;                             % simulation will last 300 s
@@ -19,11 +19,23 @@ beta = 2;                                 % parameter beta for VSPI
 sigma = 2;                                % parameter sigma for VSPI
 error = zeros(length(t),1);               % difference between Q set point TSO and Q delivered by PPM
 u = zeros(length(t),1);                   % output VSPI controller
-Q_sp_pcc = zeros(1,length(t));            % TSO Q set point request
-Q_ppm = zeros(1,length(t));               % Q delivered by PPM at PCC
-Q_big = zeros(1,length(t));               % Q that will be devided over the strings
-threshold_opt = 3;                        % threshold for implementing optimization set point
-Opti_switch = FALSE;                      % logic variable that determines optimization usage
+Q_pcc = zeros(length(t),1);               % Q at PCC
+Q_sp_pcc = zeros(length(t),1);            % TSO Q set point request
+Q_sp_strings = zeros(length(t), Ntb+Npv); % Q set point for each string at some time instants
+Q_ppm = zeros(length(t),1);               % Q delivered by PPM at PCC
+Q_big = zeros(length(t),1);               % Q that will be devided over the strings
+Q_available_m = zeros(length(t), Ntb+Npv);% Q available for each string at a certain time instant
+Q_current_string = zeros(length(t), Ntb+Npv); % Q currently produced by each string
+threshold_opt = 0.1;                      % threshold for implementing optimization set point
+Opti_switch = false;                      % logic variable that determines optimization usage
+Opti_new = true;                          % logic variable to indicate that optimization set point is based on latest TSO request
+count = 0;                                % variable to determine stability PPM output
+Interrupt = 0;                            % variable indicating an interrupt signal for optimization
+distribution = 0:0.01:1;                   % distribution factor determining set points strings
+opti_distribution = zeros(1,length(distribution)); % vector used to determine optimal distribution factor
+Optimization_setpoint = zeros(length(t),Ntb+Npv); % optimization set points matrix
+Run_pf_setting = mpoption('verbose',0,'out.all',0); % hide MATPOWER output
+
 
 %% Set point times and values %%
 
@@ -39,7 +51,7 @@ t_sp4 = 250;                            % fourth setpoint at 250 seconds
 setpoint_values = [sp_1 sp_2 sp_3 sp_4];    % vector containing set points
 setpoint_times = [t_sp1 t_sp2 t_sp3 t_sp4]; % vector containing set point times
 
-%% setting up input vector P_sp_PCC containing the setpoints %%
+%% setting up input vector Q_sp_pcc containing the setpoints %%
 
 idx_begin = 1;
 for i = 2:length(setpoint_values)
@@ -51,7 +63,7 @@ Q_sp_pcc(idx_begin:end) = setpoint_values(end);
 
 %% Initialize wind capability
 
-stepsize = 0.1;
+stepsize = 0.01;
 vmin = 0;
 vmax = 30;
 v = vmin:stepsize:vmax;
@@ -61,7 +73,7 @@ endsamp_string = 25/stepsize + 1;
 
 %% Initialize PV capability
 
-irradiance = linspace(0,680,300);         % solar profile for capability curver
+irradiance = linspace(0,990,3000);         % solar profile for capability curver
 [Ppvg_string,Qpvg_string] = compute_pq_pvg(irradiance,Npv);
 Structure_Size = Ntb+Npv;  %number of elements
 PQ(Structure_Size) = struct();
@@ -92,8 +104,9 @@ end
 %% Obtain Q available for each strings %%
 
 % load in P of each string at every time instant
-%APC = P_current_string.';
-APC = 10*ones(Ntb+Npv, length(t));
+load('agreed_profiles.mat') % load wind and solar profiles
+[ P_current_string ] = active_power_func( windspeed, irradiance );
+APC = P_current_string.';
 
 % convert outcome from previous steps into Qavailable for each string at every
 % time instant
@@ -105,21 +118,45 @@ for i = 1:Ntb+Npv
     end
 end
 
+for i = 1:Ntb+Npv
+    Q_available_m(:,i) = Q_available(i).string(1:end);
+end
+
+%% Run initial power flow %%
+
+system = loadcase('system_17');
+system.gen(6:end,[3,4,5]) = [(Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb,1)).' (Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb,1)).' (Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb,1)).'];
+system.gen(2:5,[2,9,10]) = [(Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).' (Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).' (Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).'];
+current_values = runpf(system);
+Q_current_string(1:Ntb,1) = current_values.gen(6:18,3);
+Q_current_string(Ntb+1:end,1) = current_values.gen(2:5,3);
+Q_pcc(1) = -1 * current_values.gen(1,3);
 %% Iterate over time %%
 
 for j = 1:length(t)
  
 % (depends on mode)if the Reactive Power Exchange at the PCC or the Voltage Deviation at the PCC exceeds the predefined 
 % Disturbance Threshold, the Reactive Power Support of the PPM must be maintained for at least 15 minutes.
+    
+    % detect set point change %
+    if j > 1
+        if Q_sp_pcc(j) ~= Q_sp_pcc(j-1)
+            Opti_new = false;
+        end
+    end
+    
+    % detect change in optimization set point after set point change %
+    if Opti_new == false && Optimization_setpoint(j,:) ~= Optimization_setpoint(j-1,:)
+       Opti_new = true;
+    end
 
 error(j) =  Q_sp_pcc(j) - Qppm(j);
     
-u(j) = k_p*( error(j) + trapz( (error/T_i)*exp(-(error^2)/(2*beta^(2)*sigma^2)) ) ); 
+u(j) = k_p*( error(j) + trapz(t, (error/T_i)*exp(-(error.^2)./(2*beta^(2)*sigma^2)) ) ); 
 
 Q_big(j) = u(j) + Q_sp_pcc(j);
 
     % Check if set point is reached and stable %
-    count = 0;
     if error(j) < threshold
         count = count+1;
             if count == 100
@@ -128,21 +165,79 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
     else
         count = 0;
     end
-% 
-% If Opti_switch = FALSE
-% Dat verdelen over strings adhv DF (Let op Q_a_i):
-%     - Can setpoint be reached with generators?
+    
+    %--- determine set points ---%
+    if Opti_switch == 0
+        
+        z = dec2bin(2^Ntb-1:-1:0)-'0'; % create matrix with each row one the possible
+                                       % combinations of 0 and 1 for Ntb
+                                       % amount of number
+        % turn each 0 into -1 %                               
+        for l = 1:length(z(1,:))
+            for k = 1:length(z(:,1))
+                if z(k,l) == 0
+                    z(k,l) = -1;
+                end
+            end
+        end
+        
+        % create a matrix with all possible combinations of the signs %
+        % of the reactive power produced %
+        optQs = zeros(length(z(:,1),Ntb+Npv));
+        for i = 1:length(z(:,1))
+            optQs(i,1) = [(z(i,:).*Q_available_m(j,1:Ntb)) Q_available_m(j,Ntb+1:end)];
+        end
+        
+        % determine best distribution factor and best combination of signs %
+        Q_options = zeros(length(optQs(:,1))*length(distribution),3);
+        s = 0;
+        for k = 1:length(optQs(:,1))
+            for i = 1:length(distribution)
+                s = s + 1;
+                Q_options(s,1) = abs( u(j) - sum(distribution(i)*optQs(k,:)) );
+                Q_options(s,2) = k;
+                Q_options(s,3) = i;
+            end
+        end
+        
+        [valBest, idxBest] = min(options(:,1));
+        kbest = options(idxBest,2);
+        ibest = options(idxBest,3);
+        
+        Q_sp_strings(j,:) = distribution(ibest)*optQs(kbest,:); 
+        
+        
+    % Dat verdelen over strings adhv DF (Let op Q_a_i):
 %     - regels bedenken verdelen en bij Capabillty limits
-%     - setpoint feasibility optimisation check
-%     - Rules voor interrupt naar optimisation
 %     - component status
 %     - Last resort: OLTC, Reactor control
 % Power fow runnen voor nieuwe Q output
 % 
-% Elseif Opti_switch = TRUE
-%     if error > waarde
-%         Opti_switch = FALSE
-%         Interrupt ON
-%     DF = opti setpoint
-% 
+    elseif Opti_switch == 1 && Opti_new == 1
+        
+        Q_sp_strings(j,:) = Optimization_setpoint(j,:); % implement optimization set point
+        %---- check feasibility optimization set points ----% 
+        if error > threshold
+            Opti_switch = false;
+        end
+        for i=1:Ntb+Npv % check for set points being within available Q bounds
+            if abs(Q_available(i).string(j)) < abs(Optimization_setpoint(j,i))
+                Opti_switch = false;
+            end
+        end
+    end
+
+    
+    %--- apply set points ---%
+    system.gen(6:end,[3,4,5]) = [Q_sp_strings(j,1:Ntb).' Q_sp_strings(j,1:Ntb).' Q_available_m(j,1:Ntb).'];
+    system.gen(2:5,[2,9,10]) = [Q_sp_strings(j,Ntb+1:end).' Q_sp_strings(j,Ntb+1:end).' Q_available_m(j,Ntb+1:end).'];
+    current_values = runpf(system, Run_pf_setting);
+    Q_current_string(j+1,1:Ntb) = current_values.gen(6:18,3);
+    Q_current_string(j+1,Ntb+1:end) = current_values.gen(2:5,3);
+    Q_pcc(j+1) = -1 * current_values.gen(1,3);
 end
+
+plot(t,Q_pcc)
+hold on
+plot(t,Q_sp_pcc)
+    
