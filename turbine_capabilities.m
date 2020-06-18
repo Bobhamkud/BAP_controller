@@ -1,6 +1,6 @@
 clear all
 close all
-
+tic
 stepsize = 0.1;
 vmin = 0;
 vmax = 30;
@@ -30,3 +30,4 @@ plot(v,Q(:,i))
 xlabel('windspeed [m/s]')
 ylabel('Q [MVAr]')
 end
+toc

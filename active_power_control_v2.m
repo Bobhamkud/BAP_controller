@@ -72,8 +72,8 @@ output = 'Pwf';
 APs = {'tb1','tb2','tb3'};
 %% Simulate the behaviour %%
 
-P_a(1:end) = 10e6*[30;40;50];   % initialize available power
-P(1:end) = 10e6*[15;15;15];     % intialize currently produced active power
+P_a(1:end) = 1e6*[10;10;10];   % initialize available power
+P(1:end) = 1e6*[5;5;5];     % intialize currently produced active power
 y1_tot = zeros(1, length(t));   % initialize output vector
 ytb1_tot = zeros(1, length(t)); % initialize output vector turbine 1
 ytb2_tot = zeros(1, length(t)); % initialize output vector turbine 2
@@ -83,12 +83,12 @@ x0 = zeros(1,13);               % intialize vector containing states
 x1 = zeros(1,13);               % intialize vector containing states
 x2 = zeros(1,13);               % intialize vector containing states
 x3 = zeros(1,13);               % intialize vector containing states
-t_end = 0;                      % initialize end time step
-u_end = 0;                      % initialize end input step
+t_end = 1;                      % initialize end time step
+u_end = 1;                      % initialize end input step
 
 for i=0:dt_DF:Tfinal
     
-    DF = calc_DF( P, P_a, a_p ); % calculate distribution factors
+    DF = calc_DF( P, P_a, a_p , u, t_end ); % calculate distribution factors
     blk1.Gain.Value = DF(1);
     blk2.Gain.Value = DF(2);
     blk3.Gain.Value = DF(3);
@@ -159,7 +159,8 @@ hold on
 plot(t, ytb1_tot+ytb2_tot+ytb3_tot)
 
 %% Distribution factor %%
-function [ DF ] = calc_DF( P, P_a, a_p )
-s = ((P_a - P) .* (P_a.^2)) ./ (P_a.^2 + a_p);
+function [ DF ] = calc_DF( P, P_a, a_p, u, t_end )
+
+s = ((P_a - P) .* (P_a.^2) .* (sum(P)- u(t_end))^2 ) ./ (P_a.^2 + a_p);
 DF = (s./sum(s))';
 end

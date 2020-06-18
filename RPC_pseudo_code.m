@@ -13,8 +13,8 @@ Ntb = 13;                                 % number of wind turbine strings
 Npv = 4;                                  % number of PV module strings
 t = 0:dt:Tfinal;                          % time vector
 Q_sp = zeros(length(t), 1);               % initialize input vector with Q set points
-k_p = 1;                                  % proportional gain VSPI controller
-T_i = 0.7;                                % integral time constant VSPI controller
+k_p = 0.9;                                  % proportional gain VSPI controller
+T_i = 1;                                % integral time constant VSPI controller
 beta = 2;                                 % parameter beta for VSPI
 sigma = 2;                                % parameter sigma for VSPI
 error = zeros(length(t),1);               % difference between Q set point TSO and Q delivered by PPM
@@ -238,7 +238,8 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
     Q_pcc(j+1) = -1 * current_values.gen(1,3);
 end
 
-plot(t,Q_pcc)
+plot(t,Q_pcc(1:end-1))
 hold on
 plot(t,Q_sp_pcc)
+title('kp=1,T1=0.15,beta=1,sigma=1')
     
