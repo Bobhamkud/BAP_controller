@@ -43,8 +43,17 @@ irradiance2 = irradiance1+variation2+variation3;
 % irradiance2(9001) = setting_solar(3);
 % irradiance2(13501) = setting_solar(4);
 
-
+load('Agreed_profiles.mat')
 figure
-plot(t,v1,t,v2)
-figure
-plot(t,irradiance1,t,irradiance2)
+subplot(1,2,1)
+plot(t*dt/60,v1,t*dt/60,v2)
+ylabel('Windspeed [m/s]')
+xlabel('Time [min]')
+legend('Base line','Added fluctuations')
+title('Wind Speed for 1 Hour')
+subplot(1,2,2)
+plot(t*dt/60,irradiance1,t*dt/60,irradiance2)
+ylabel('Irradiance [W/m²]')
+xlabel('Time [min]')
+legend('Base line','Added fluctuations')
+title('Solar Irradiance for 1 Hour')
