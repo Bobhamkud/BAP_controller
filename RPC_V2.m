@@ -8,15 +8,17 @@ close all
 %% Initializations %%
 
 dt = 200e-3;                              % 200 ms sample time
-Tfinal = 10;                              % simulation will last 300 s
+Tfinal = 300;                              % simulation will last 300 s
 Ntb = 13;                                 % number of wind turbine strings
 Npv = 4;                                  % number of PV module strings
 t = 0:dt:Tfinal;                          % time vector
 Q_sp = zeros(length(t), 1);               % initialize input vector with Q set points
-k_p = 0.9;                               % proportional gain VSPI controller
-T_i = 0.7;                                % integral time constant VSPI controller
-beta = 10;                                 % parameter beta for VSPI
-sigma = 10;                                % parameter sigma for VSPI
+k_p = 0.16;                               % proportional gain VSPI controller
+T_i = 1.5;                                % integral time constant VSPI controller
+%k_i = 20000;
+bs = 167;
+beta = 14;                                 % parameter beta for VSPI
+sigma = 171/14;                                % parameter sigma for VSPI
 error = zeros(length(t),1);               % difference between Q set point TSO and Q delivered by PPM
 u = zeros(length(t),1);                   % output VSPI controller
 Q_pcc = zeros(length(t),1);               % Q at PCC
@@ -41,11 +43,11 @@ Run_pf_setting = mpoption('verbose',0,'out.all',0); % hide MATPOWER output
 
 sp_1 = 0;                               % first setpoint 0 MVar
 t_sp1 = 0;                              % first set point at 0 seconds
-sp_2 = 10;                              % second setpoint 50 MVar
-t_sp2 = 100;                            % second setpoint at 100 seconds
-sp_3 = 0;                               % third setpoint 0 MVar
+sp_2 = 100;                              % second setpoint 50 MVar
+t_sp2 =  100;                           % second setpoint at 100 seconds
+sp_3 = 50;                               % third setpoint 0 MVar
 t_sp3 = 200;                            % third setpoint at 200 seconds
-sp_4 = 0;                               % fourth setpoint 0 MVar
+sp_4 = 50;                               % fourth setpoint 0 MVar
 t_sp4 = 250;                            % fourth setpoint at 250 seconds
 
 setpoint_values = [sp_1 sp_2 sp_3 sp_4];    % vector containing set points
@@ -149,7 +151,7 @@ Q_pcc(1) = -1 * current_values.gen(1,3);
 z = [ones(1,Ntb);-1*ones(1,Ntb)];
 
 for j = 1:length(t)
-    j
+    
  
 % (depends on mode)if the Reactive Power Exchange at the PCC or the Voltage Deviation at the PCC exceeds the predefined 
 % Disturbance Threshold, the Reactive Power Support of the PPM must be maintained for at least 15 minutes.
@@ -167,8 +169,12 @@ for j = 1:length(t)
     end
 
 error(j) =  Q_sp_pcc(j) - Q_pcc(j);
-    
-u(j) = k_p*( error(j) + trapz(t, (error/T_i).*exp(-(error.^2)./(2*beta^(2)*sigma^2)) ) ); 
+%if j<2
+    u(j) = k_p*( error(j) + trapz(t, (error/T_i).*exp(-(error.^2)./(2*(bs^2))) ));
+%else
+%    u(j) = k_p*( error(j) + trapz(t, (error/T_i).*exp(-(error.^2)./(2*(bs^2))) )+ (error(j)-error(j-1))/(t(j)-t(j-1))/k_i);
+%end
+
 
 Q_big(j) = u(j) + Q_sp_pcc(j);
 
@@ -176,7 +182,8 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
     if error(j) < threshold_opt
         count = count+1;
             if count == 5
-                Opti_switch = 1; % implement optimazation setpoints
+                %Opti_switch = 1; % implement optimazation setpoints
+                Opti_switch = 0;
             end         
     else
         count = 0;
@@ -209,6 +216,7 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
         ibest = Q_options(idxBest,3);
         
         Q_sp_strings(j,:) = distribution(ibest)*optQs(kbest,:); 
+        Q_big(j)
         sum(Q_sp_strings(j,:))
         
     % Dat verdelen over strings adhv DF (Let op Q_a_i):

@@ -4,11 +4,11 @@ close all
 
 sp_1 = 0;                               % first setpoint 0 MVar
 t_sp1 = 0;                              % first set point at 0 seconds
-sp_2 = 50;                              % second setpoint 50 MVar
+sp_2 = 100;                              % second setpoint 50 MVar
 t_sp2 = 100;                            % second setpoint at 100 seconds
-sp_3 = 0;                               % third setpoint 0 MVar
+sp_3 = 50;                               % third setpoint 0 MVar
 t_sp3 = 200;                            % third setpoint at 200 seconds
-sp_4 = 0;                               % fourth setpoint 0 MVar
+sp_4 = 50;                               % fourth setpoint 0 MVar
 t_sp4 = 250;                            % fourth setpoint at 250 seconds
 
 setpoint_values = [sp_1 sp_2 sp_3 sp_4];    % vector containing set points
@@ -17,7 +17,7 @@ setpoint_times = [t_sp1 t_sp2 t_sp3 t_sp4]; % vector containing set point times
 %% setting up input vector Q_sp_pcc containing the setpoints %%
 
 dt = 200e-3;                              % 200 ms sample time
-Tfinal = 10;                              % simulation will last 300 s
+Tfinal = 50;                              % simulation will last 300 s
 Ntb = 13;                                 % number of wind turbine strings
 Npv = 4;                                  % number of PV module strings
 t = 0:dt:Tfinal;                          % time vector
@@ -103,19 +103,23 @@ jl3_best = 0;
 jl4_best = 0;
 
 
-k_p = 0:0.04:0.99;                % proportional gain VSPI controller
-T_i = 0.01:0.5:3;                 % integral time constant VSPI controller
-beta = 1.5;                       % parameter beta for VSPI
-sigma = 1.5;                      % parameter sigma for VSPI
-
+k_p = 0.12:0.01:0.19;                             % proportional gain VSPI controller
+T_i = 1.5:0.1:2;                        % integral time constant VSPI controller
+beta = 12:1:14;                        % parameter beta for VSPI
+sigma = 12:1:14;                            % parameter sigma for VSPI
+bs = 167:2:175;
+r_best_new = length(t);
+AE_best = 1000000000000000000;
+SE_best = 1000000000000000000;
 steady_error = 10000*ones(length(k_p)*length(T_i)*length(beta)*length(sigma)+100,1);
+stable_error = 10000*ones(length(k_p)*length(T_i)*length(beta)*length(sigma)+100,1);
 srt = 0;
 for jl1 = 1:length(k_p)
     k_p(jl1)
     for jl2 = 1:length(T_i)
-        T_i(jl2)
-        for jl3 = 1:length(beta)
-            for jl4 = 1:length(sigma)
+        for jl5 = 1:length(bs)
+            %for jl3 = 1:length(beta)
+                %for jl4 = 1:length(sigma)
                 srt = srt+1;
 
 %% Initializations %%
@@ -152,17 +156,19 @@ Q_current_string(1,Ntb+1:end) = current_values.gen(2:5,3);
 Q_pcc(1) = -1*current_values.gen(1,3);
 %% Iterate over time %%
 
-                z = dec2bin(2^Ntb-1:-1:0)-'0'; % create matrix with each row one the possible
-                                                       % combinations of 0 and 1 for Ntb
-                                                       % amount of number
-                % turn each 0 into -1 %                               
-                for l = 1:length(z(1,:))
-                    for k = 1:length(z(:,1))
-                        if z(k,l) == 0
-                            z(k,l) = -1;
-                        end
-                    end
-                end
+                % z = dec2bin(2^Ntb-1:-1:0)-'0'; % create matrix with each row one the possible
+                %                                        % combinations of 0 and 1 for Ntb
+                %                                        % amount of number
+                % % turn each 0 into -1 %                               
+                % for l = 1:length(z(1,:))
+                %     for k = 1:length(z(:,1))
+                %         if z(k,l) == 0
+                %             z(k,l) = -1;
+                %         end
+                %     end
+                % end
+
+                z = [ones(1,Ntb);-1*ones(1,Ntb)];
 
                 for j = 1:length(t)
 
@@ -183,15 +189,16 @@ Q_pcc(1) = -1*current_values.gen(1,3);
 
                 error(j) =  Q_sp_pcc(j) - Q_pcc(j);
 
-                u(j) = k_p(jl1)*( error(j) + trapz(t, (error/T_i(jl2)).*exp(-(error.^2)./(2*beta(jl3)^(2)*sigma(jl4)^2) ) ) ); 
-
+                %u(j) = k_p(jl1)*( error(j) + trapz(t, (error/T_i(jl2)).*exp(-(error.^2)./(2*beta(jl3)^(2)*sigma(jl4)^2) ) ) ); 
+                u(j) = k_p(jl1)*( error(j) + trapz(t, (error/T_i(jl2)).*exp(-(error.^2)./(2*(bs(jl5)^2) ) ) )); 
                 Q_big(j) = u(j) + Q_sp_pcc(j);
 
                     % Check if set point is reached and stable %
                     if error(j) < threshold_opt
                         count = count+1;
                             if count == 100
-                                Opti_switch = TRUE; % implement optimazation setpoints
+                                %Opti_switch = 1; % implement optimazation setpoints
+                                Opti_switch = 0;
                             end         
                     else
                         count = 0;
@@ -254,16 +261,51 @@ Q_pcc(1) = -1*current_values.gen(1,3);
                     Q_current_string(j+1,Ntb+1:end) = current_values.gen(2:5,3);
                     Q_pcc(j+1) = -1*current_values.gen(1,3);
                 end
-                steady_error(srt) = abs(Q_sp_pcc(50)-Q_pcc(50));
-                if srt > 1
-                    if steady_error(srt) < steady_error(srt-1)
-                        k_p_best = k_p(jl1);
-                        T_i_best = T_i(jl2);
-                        beta_best = beta(jl3);
-                        sigma_best = sigma(jl4);
-                    end    
+                if sum(abs(Q_sp_pcc-Q_pcc(end-1))) < AE_best
+                    AE_best = sum(abs(Q_sp_pcc-Q_pcc(end-1)));
+                    k_p_AE_best = k_p(jl1);
+                    T_i_AE_best = T_i(jl2);
+                    bs_AE_best = bs(jl5);
                 end
-            end
+                if sum((Q_sp_pcc-Q_pcc(end-1)).^2) < SE_best
+                    SE_best = sum((Q_sp_pcc-Q_pcc(end-1)).^2);
+                    k_p_SE_best = k_p(jl1);
+                    T_i_SE_best = T_i(jl2);
+                    bs_SE_best = bs(jl5);
+                end
+                    
+%                 for r=1:length(Q_pcc)-1
+%                     if (Q_pcc(r)>-1 && Q_pcc(r)<1) && (Q_pcc(r+1)>-1 && Q_pcc(r+1)<1)
+%                         r_best_old = r;
+%                         if r_best_old < r_best_new
+%                             r_best_new = r_best_old;
+%                             k_p_best = k_p(jl1);
+%                             T_i_best = T_i(jl2);
+%                             bs_best = bs(jl5);
+%                         end
+%                         break
+%                     end                        
+%                 end
+%                 steady_error(srt) = abs(Q_sp_pcc(100)-Q_pcc(100));
+%                 stable_error(srt) = abs(Q_pcc(100)-Q_pcc(99));
+%                 if srt > 1
+%                     if steady_error(srt) < steady_error(srt-1)
+%                         k_p_best = k_p(jl1);
+%                         T_i_best = T_i(jl2);
+%                         bs_best = bs(jl5);
+%                         %beta_best = beta(jl3);
+%                         %sigma_best = sigma(jl4);
+%                     end
+%                     if stable_error(srt) < stable_error(srt-1)
+%                         k_p_stable_best = k_p(jl1);
+%                         T_i_stable_best = T_i(jl2);
+%                         bs_stable_best = bs(jl5);
+%                         %beta__stable_best = beta(jl3);
+%                         %sigma__stable_best = sigma(jl4);
+%                     end
+%                 end
+            %end
+            %end
         end
     end
 end
