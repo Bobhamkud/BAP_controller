@@ -8,15 +8,15 @@ close all
 %% Initializations %%
 
 dt = 200e-3;                              % 200 ms sample time
-Tfinal = 10;                             % simulation will last 300 s
+Tfinal = 50;                              % simulation will last 300 s
 Ntb = 13;                                 % number of wind turbine strings
 Npv = 4;                                  % number of PV module strings
 t = 0:dt:Tfinal;                          % time vector
 Q_sp = zeros(length(t), 1);               % initialize input vector with Q set points
-k_p = 0.9;                                  % proportional gain VSPI controller
-T_i = 1;                                % integral time constant VSPI controller
-beta = 2;                                 % parameter beta for VSPI
-sigma = 2;                                % parameter sigma for VSPI
+k_p = 0.87;                               % proportional gain VSPI controller
+T_i = 1.95;                                % integral time constant VSPI controller
+beta = 13;                                 % parameter beta for VSPI
+sigma = 168/13;                                % parameter sigma for VSPI
 error = zeros(length(t),1);               % difference between Q set point TSO and Q delivered by PPM
 u = zeros(length(t),1);                   % output VSPI controller
 Q_pcc = zeros(length(t),1);               % Q at PCC
@@ -31,7 +31,7 @@ Opti_switch = false;                      % logic variable that determines optim
 Opti_new = true;                          % logic variable to indicate that optimization set point is based on latest TSO request
 count = 0;                                % variable to determine stability PPM output
 Interrupt = 0;                            % variable indicating an interrupt signal for optimization
-distribution = 0:0.01:1;                   % distribution factor determining set points strings
+distribution = 0:0.05:1;                   % distribution factor determining set points strings
 opti_distribution = zeros(1,length(distribution)); % vector used to determine optimal distribution factor
 Optimization_setpoint = zeros(length(t),Ntb+Npv); % optimization set points matrix
 Run_pf_setting = mpoption('verbose',0,'out.all',0); % hide MATPOWER output
@@ -41,7 +41,7 @@ Run_pf_setting = mpoption('verbose',0,'out.all',0); % hide MATPOWER output
 
 sp_1 = 0;                               % first setpoint 0 MVar
 t_sp1 = 0;                              % first set point at 0 seconds
-sp_2 = 50;                              % second setpoint 50 MVar
+sp_2 = 10;                              % second setpoint 50 MVar
 t_sp2 = 100;                            % second setpoint at 100 seconds
 sp_3 = 0;                               % third setpoint 0 MVar
 t_sp3 = 200;                            % third setpoint at 200 seconds
@@ -105,7 +105,8 @@ end
 
 % load in P of each string at every time instant
 load('agreed_profiles.mat') % load wind and solar profiles
-[ P_current_string ] = active_power_func( windspeed, irradiance );
+load('P_current_RPC.mat')
+%[ P_current_string ] = active_power_func( windspeed, irradiance );
 APC = P_current_string.';
 
 % convert outcome from previous steps into Qavailable for each string at every
@@ -172,8 +173,8 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
     % Check if set point is reached and stable %
     if error(j) < threshold_opt
         count = count+1;
-            if count == 100
-                Opti_switch = TRUE; % implement optimazation setpoints
+            if count == 5
+                Opti_switch = 1; % implement optimazation setpoints
             end         
     else
         count = 0;
