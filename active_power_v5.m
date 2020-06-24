@@ -1,5 +1,6 @@
 clear
 close all
+tic
 %% Initializations %%
 
 dt = 200e-3;                                    % 10 ms sample time
@@ -16,6 +17,7 @@ P_pcc = zeros(1,length(t));                     % initialize vector with current
 case_log = zeros(1,length(t));                  % initialize case log
 P_a_tot = zeros(1,length(t));                   % total available power
 P_a_wind = zeros(1,length(t));                  % total available wind power
+P_a_tot_pv = zeros(1,length(t));                % total availabel power from solar irradiance
 Run_pf_setting = mpoption('verbose',0,'out.all',0); % hide MATPOWER output
 load('agreed_profiles.mat')                         % load wind and solar profiles
 t_r = 100
@@ -25,9 +27,9 @@ sp_1 = 70;                               % first set point 70 MW
 t_sp1 = 0;                               % first set point at 0 seconds
 sp_2 = 70;                               % second set point 70 MW
 t_sp2 = 900;                             % second set point at 4500 seconds
-sp_3 = 110;                              % third set point 110 MW
+sp_3 = 135;                              % third set point 110 MW
 t_sp3 = 1800;                            % third set point at 9000 seconds
-sp_4 = 155;                              % fourth set point 55 MW
+sp_4 = 100;                              % fourth set point 55 MW
 t_sp4 = 2700;                            % fourth set point at 13500 seconds
 
 setpoint_values = [sp_1 sp_2 sp_3 sp_4];    % vector containing set points
@@ -86,6 +88,7 @@ case_3b=0;
 for j = 1:length(t)-1
      
     P_a_tot(j) = sum(P_a_string(j,:));
+    P_a_tot_pv(j) = sum(P_a_pv(:,j));
     P_a_wind(j) = sum(P_a_string(j,1:13));
     
     Delta_pcc = P_sp_pcc(j)-P_pcc(j);
@@ -226,44 +229,46 @@ for j = 1:length(t)-1
     
 end
 
-% Plot set point response % 
-plot(t,P_pcc)
+% Plot set point response and available powers % 
+close all
+plot(t,P_pcc, 'b','LineWidth', 1.9)
 hold on
-plot(t,P_sp_pcc)
-plot(t,P_a_tot, t, P_a_wind)
+plot(t,P_sp_pcc, 'g', 'LineWidth', 1)
+plot(t,P_a_tot, 'y', 'LineWidth', 0.85)
+plot(t, P_a_wind,'r', t, P_a_tot_pv, 'm')
 xlim([t(1) t(end)])
-title('Active power response for high wind profile', 'FontSize', 24)
+title('Active power response', 'FontSize', 24)
 xlabel('Time [s]', 'FontSize', 24)
 ylabel('Power [MW]', 'FontSize', 24)
-legend('PPM Response','TSO Set point', 'Total Available power', 'Wind Power')
+legend('PPM Response','TSO Set point', 'Total Available power', 'Wind Power', 'Power from solar irradiance')
 legend.FontSize = 24;
 
-% Plot wind profies % 
-figure(2)
-plot(t,v_profile)
-xlim([t(1) t(end)])
-title('Wind profile', 'FontSize', 24)
-xlabel('Time [s]', 'FontSize', 24)
-ylabel('Wind speed [m/s]', 'FontSize', 24)
+% % Plot wind profies % 
+% figure(3)
+% plot(t,v_profile)
+% xlim([t(1) t(end)])
+% title('Wind profile', 'FontSize', 24)
+% xlabel('Time [s]', 'FontSize', 24)
+% ylabel('Wind speed [m/s]', 'FontSize', 24)
 
-% Plot irradiance profile %
-figure(3)
-plot(t,solar_profile)
-xlim([t(1) t(end)])
-title('Irradiance profile', 'FontSize', 24)
-xlabel('Time [s]', 'FontSize', 24)
-ylabel('Irradiance [W/m^{2}]', 'FontSize', 24)
-figure(4)
+% % Plot irradiance profile %
+% figure(4)
+% plot(t,solar_profile)
+% xlim([t(1) t(end)])
+% title('Irradiance profile', 'FontSize', 24)
+% xlabel('Time [s]', 'FontSize', 24)
+% ylabel('Irradiance [W/m^{2}]', 'FontSize', 24)
 
-% Plot case occurences %
-plot(t,case_log*100)
-xlim([t(1) t(end)])
-title('Cases that occur during simulation', 'FontSize', 24)
-xlabel('Time [s]', 'FontSize', 24)
-ylabel('Case nuber times 100', 'FontSize', 24)
+% % Plot case occurences %
+% figure(5)
+% plot(t,case_log*100)
+% xlim([t(1) t(end)])
+% title('Cases that occur during simulation', 'FontSize', 24)
+% xlabel('Time [s]', 'FontSize', 24)
+% ylabel('Case nuber times 100', 'FontSize', 24)
 
 % Plot individual set points % 
-figure(5)
+figure(6)
 plot(t,P_sp_string(:,1), t,P_sp_string(:,2),t,P_sp_string(:,3),t,P_sp_string(:,4))
 hold on
 plot(t,P_sp_string(:,5),t,P_sp_string(:,6),t,P_sp_string(:,7),t,P_sp_string(:,8))
@@ -274,6 +279,7 @@ xlim([t(1) t(end)])
 title('Individual set points for strings', 'FontSize', 24)
 xlabel('Time [s]', 'FontSize', 24)
 ylabel('Power [MW]', 'FontSize', 24)
+toc
 %% Distribution factor %%
 function [ beta ] = calc_DF( P, P_a, a_p)
 s = (P_a.^2) ./ (P_a.^2 + a_p);

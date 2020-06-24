@@ -8,17 +8,17 @@ close all
 %% Initializations %%
 
 dt = 200e-3;                              % 200 ms sample time
-Tfinal = 300;                              % simulation will last 300 s
+Tfinal = 3600;                            % simulation will last 300 s
 Ntb = 13;                                 % number of wind turbine strings
 Npv = 4;                                  % number of PV module strings
 t = 0:dt:Tfinal;                          % time vector
 Q_sp = zeros(length(t), 1);               % initialize input vector with Q set points
-k_p = 0.16;                               % proportional gain VSPI controller
-T_i = 1.5;                                % integral time constant VSPI controller
+k_p = 0.12;                               % proportional gain VSPI controller
+T_i = 8;                                % integral time constant VSPI controller
 %k_i = 20000;
-bs = 167;
-beta = 14;                                 % parameter beta for VSPI
-sigma = 171/14;                                % parameter sigma for VSPI
+bs = 72;
+beta = 14;                                % parameter beta for VSPI
+sigma = 171/14;                           % parameter sigma for VSPI
 error = zeros(length(t),1);               % difference between Q set point TSO and Q delivered by PPM
 u = zeros(length(t),1);                   % output VSPI controller
 Q_pcc = zeros(length(t),1);               % Q at PCC
@@ -28,6 +28,10 @@ Q_ppm = zeros(length(t),1);               % Q delivered by PPM at PCC
 Q_big = zeros(length(t),1);               % Q that will be devided over the strings
 Q_available_m = zeros(length(t), Ntb+Npv);% Q available for each string at a certain time instant
 Q_current_string = zeros(length(t), Ntb+Npv); % Q currently produced by each string
+Q_available_wind = zeros(length(t),1);    % total available reactive power from wind
+Q_available_solar = zeros(length(t),1);   % total available reactive power from solar irradiance
+Q_total_available = zeros(length(t),1);   % total available reactive power
+trap = zeros(length(t),1);                % vector holding the outputs of the integrator
 threshold_opt = 0.1;                      % threshold for implementing optimization set point
 Opti_switch = false;                      % logic variable that determines optimization usage
 Opti_new = true;                          % logic variable to indicate that optimization set point is based on latest TSO request
@@ -41,14 +45,14 @@ Run_pf_setting = mpoption('verbose',0,'out.all',0); % hide MATPOWER output
 
 %% Set point times and values %%
 
-sp_1 = 0;                               % first setpoint 0 MVar
-t_sp1 = 0;                              % first set point at 0 seconds
+sp_1 = 0;                                % first setpoint 0 MVar
+t_sp1 = 0;                               % first set point at 0 seconds
 sp_2 = 100;                              % second setpoint 50 MVar
-t_sp2 =  100;                           % second setpoint at 100 seconds
-sp_3 = 50;                               % third setpoint 0 MVar
-t_sp3 = 200;                            % third setpoint at 200 seconds
-sp_4 = 50;                               % fourth setpoint 0 MVar
-t_sp4 = 250;                            % fourth setpoint at 250 seconds
+t_sp2 =  1800;                           % second setpoint at 100 seconds
+sp_3 = -50;                               % third setpoint 0 MVar
+t_sp3 = 2700;                            % third setpoint at 200 seconds
+sp_4 = -50;                               % fourth setpoint 0 MVar
+t_sp4 = 2900;                            % fourth setpoint at 250 seconds
 
 setpoint_values = [sp_1 sp_2 sp_3 sp_4];    % vector containing set points
 setpoint_times = [t_sp1 t_sp2 t_sp3 t_sp4]; % vector containing set point times
@@ -107,7 +111,7 @@ end
 
 % load in P of each string at every time instant
 load('agreed_profiles.mat') % load wind and solar profiles
-load('P_current_RPC.mat')
+load('P_current_RPC_thesis.mat')
 %[ P_current_string ] = active_power_func( windspeed, irradiance );
 APC = P_current_string.';
 
@@ -128,8 +132,8 @@ end
 %% Run initial power flow %%
 
 system = loadcase('system_17');
-system.gen(6:end,[3,4,5]) = [(Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb)).' (Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb)).' (Q_available_m(1,1:Ntb)-0.3*Q_available_m(1,1:Ntb)).'];
-system.gen(2:5,[3,4,5]) = [(Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).' (Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).' (Q_available_m(1, Ntb+1:end)-0.3*Q_available_m(1,Ntb+1:end)).'];
+system.gen(6:end,[3,4,5]) = [(Q_available_m(1,1:Ntb)-0.4*Q_available_m(1,1:Ntb)).' (Q_available_m(1,1:Ntb)-0.4*Q_available_m(1,1:Ntb)).' (Q_available_m(1,1:Ntb)-0.4*Q_available_m(1,1:Ntb)).'];
+system.gen(2:5,[3,4,5]) = [(Q_available_m(1, Ntb+1:end)-0.4*Q_available_m(1,Ntb+1:end)).' (Q_available_m(1, Ntb+1:end)-0.4*Q_available_m(1,Ntb+1:end)).' (Q_available_m(1, Ntb+1:end)-0.4*Q_available_m(1,Ntb+1:end)).'];
 current_values = runpf(system, Run_pf_setting);
 Q_current_string(1,1:Ntb) = current_values.gen(6:18,3);
 Q_current_string(1,Ntb+1:end) = current_values.gen(2:5,3);
@@ -151,7 +155,12 @@ Q_pcc(1) = -1 * current_values.gen(1,3);
 z = [ones(1,Ntb);-1*ones(1,Ntb)];
 
 for j = 1:length(t)
-    
+    if j == 680
+        swer = 1;
+    end
+    Q_available_wind(j) = sum(Q_available_m(j,(1:Ntb)));
+    Q_available_solar(j) = sum(Q_available_m(j,(Ntb+1:end)));
+    Q_total_available(j) = sum(Q_available_m(j,:));
  
 % (depends on mode)if the Reactive Power Exchange at the PCC or the Voltage Deviation at the PCC exceeds the predefined 
 % Disturbance Threshold, the Reactive Power Support of the PPM must be maintained for at least 15 minutes.
@@ -170,6 +179,7 @@ for j = 1:length(t)
 
 error(j) =  Q_sp_pcc(j) - Q_pcc(j);
 %if j<2
+trap(j) = trapz(t, (error/T_i).*exp(-(error.^2)./(2*(bs^2))) );
     u(j) = k_p*( error(j) + trapz(t, (error/T_i).*exp(-(error.^2)./(2*(bs^2))) ));
 %else
 %    u(j) = k_p*( error(j) + trapz(t, (error/T_i).*exp(-(error.^2)./(2*(bs^2))) )+ (error(j)-error(j-1))/(t(j)-t(j-1))/k_i);
@@ -216,8 +226,8 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
         ibest = Q_options(idxBest,3);
         
         Q_sp_strings(j,:) = distribution(ibest)*optQs(kbest,:); 
-        Q_big(j)
-        sum(Q_sp_strings(j,:))
+        abs(Q_big(j)-sum(Q_sp_strings(j,:)))
+        
         
     % Dat verdelen over strings adhv DF (Let op Q_a_i):
 %     - regels bedenken verdelen en bij Capabillty limits
@@ -248,9 +258,19 @@ Q_big(j) = u(j) + Q_sp_pcc(j);
     Q_current_string(j+1,Ntb+1:end) = current_values.gen(2:5,3);
     Q_pcc(j+1) = -1 * current_values.gen(1,3);
 end
-
-plot(t,Q_pcc(1:end-1))
+figure(1)
+plot(t,Q_pcc(1:end-1),'b','LineWidth', 1.9)
 hold on
-plot(t,Q_sp_pcc)
-title('kp=1,T1=0.15,beta=1,sigma=1')
+plot(t,Q_sp_pcc, 'g', 'LineWidth', 1)
+plot(t,Q_total_available, 'y', 'LineWidth', 0.85)
+plot(t, Q_available_wind,'r', t, Q_available_solar, 'm')
+xlim([t(1) t(end)])
+title('Reactive power response', 'FontSize', 24)
+xlabel('Time [s]', 'FontSize', 24)
+ylabel('Power [MVar]', 'FontSize', 24)
+legend('PPM Response','TSO Set point', 'Total Available power', 'Wind Power', 'Power from solar irradiance')
+legend.FontSize = 24;
+figure(2)
+plot(t,trap,'r', t, error,'g', t, u,'b', t, Q_big,'k')
+
     
