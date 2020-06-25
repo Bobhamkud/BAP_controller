@@ -9,11 +9,11 @@ Tfinal = 3600;                                  % simulation will last 18000 s
 Ntb = 13;                                       % number of wind turbine strings
 Npv = 4;                                        % number of PV module strings
 t = 0:dt:Tfinal;                                % time vector
-rise_time = 100;                                  % rise time
+rise_time = 150;                                  % rise time
 rise_end = 0;                                   % parameter used to determine end of rising to set point            
 time_done = 1;                                  % parameter used for implementing rise time
 N_rise = floor(rise_time/dt);                   % determine time_steps for rise_time
-rise = zeros(N_rise+1,Ntb+Npv);                         % initialise vector containing set points to implement rise time
+rise = zeros(N_rise+1,Ntb+Npv);                 % initialise vector containing set points to implement rise time
 
 P_sp_pcc = zeros(length(t), 1);                 % initialize input vector with P set points
 P_a_string = zeros(length(t), Ntb+Npv);         % initialize matrix with available P per string over time
@@ -103,8 +103,8 @@ case_2 =0;
 
 for j = 1:length(t)-1
 
-    [ P_a_tot, P_a_tot_pv, P_a_wind, P_sp_string, case_2 ] = RPC_time_step_setpoint(P_a_string, P_a_pv, P_sp_pcc,P_pcc,P_current_string,j, time_done, P_sp_string, a_p, Ntb, Npv,P_a_tot, P_a_tot_pv, P_a_wind, case_2);
-    [P_sp_string, time_done, rise_end] = RPC_rise_time( P_sp_string,P_sp_pcc,j, Ntb, Npv, N_rise, rise, rise_end, time_done, P_a_string);
+    [ P_a_tot, P_a_tot_pv, P_a_wind, P_sp_string, case_2] = APC_time_step_setpoint(P_a_string, P_a_pv, P_sp_pcc,P_pcc,P_current_string,j, time_done, P_sp_string, a_p, Ntb, Npv,P_a_tot, P_a_tot_pv, P_a_wind, case_2);
+    [P_sp_string, time_done, rise_end] = APC_rise_time( P_sp_string,P_sp_pcc,j, Ntb, Npv, N_rise, rise, rise_end, time_done, P_a_string);
     
     % apply set points %
     system.gen(6:end,[2,9,10]) = [P_sp_string(j,1:Ntb).' P_sp_string(j,1:Ntb).' P_sp_string(j,1:Ntb).'];
@@ -137,7 +137,7 @@ for j = 1:length(t)-1
             hold off
         end
     end
-    if j > 2 && ( (rem(j,60)==0) || j==length(t)-1 )
+    if j > 2 && ( (rem(j,80)==0) || j==length(t)-1 )
         % March through time. No replotting required, just update XData and YData
         %for k = 2:1:maxT
             for p = 1:1:1
