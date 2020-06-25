@@ -32,10 +32,10 @@ load('agreed_profiles.mat')                         % load wind and solar profil
 
 sp_1 = 70;                               % first set point 70 MW
 t_sp1 = 0;                               % first set point at 0 seconds
-sp_2 = 70;                               % second set point 70 MW
-t_sp2 = 900;                             % second set point at 4500 seconds
-sp_3 = 135;                              % third set point 110 MW
-t_sp3 = 1800;                            % third set point at 9000 seconds
+sp_2 = 30;                               % second set point 70 MW
+t_sp2 = 100;                             % second set point at 4500 seconds
+sp_3 = 60;                              % third set point 110 MW
+t_sp3 = 500;                            % third set point at 9000 seconds
 sp_4 = 100;                              % fourth set point 55 MW
 t_sp4 = 2700;                            % fourth set point at 13500 seconds
 
