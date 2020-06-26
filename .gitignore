@@ -19,3 +19,13 @@ RPC_pseudo_code.m
 RPC_pseudo_code.m
 RPC_pseudo_code_opti.m
 RPC_V2.m
+
+active_power_demonstrator.m
+
+APC_time_step_setpoint_wss_niet.m
+
+demonstrator_control_code.m
+
+RPC_time_step.m
+
+test_demonstrator.m
