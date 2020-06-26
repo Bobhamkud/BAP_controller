@@ -20,7 +20,7 @@ P_a_wind = zeros(1,length(t));                  % total available wind power
 P_a_tot_pv = zeros(1,length(t));                % total availabel power from solar irradiance
 Run_pf_setting = mpoption('verbose',0,'out.all',0); % hide MATPOWER output
 load('agreed_profiles.mat')                         % load wind and solar profiles
-t_r = 100
+
 %% Set point times and values %%
 
 sp_1 = 70;                               % first set point 70 MW
@@ -51,7 +51,6 @@ for i =1:length(v_profile)
 v_profile(i) = normrnd(7.7,0.1);
 end
 v_profile(1:end) = windspeed(1:length(t));
-v_profile(1:end) = 25;
 [P_a_string(:,1:Ntb),Qwtg_string_profile] = compute_pq_wtg(v_profile);
 
 %% Initialize irradiance profile  %%
@@ -205,20 +204,6 @@ for j = 1:length(t)-1
          end
      end
     
-     if j>1 && P_sp_pcc(j) ~= P_sp_pcc(j-1)
-        ramp = (P_sp_string(j,:) - P_current_string(j,:))/(t_r/dt);
-        r = j;
-        P_current_store(1,:) = P_current_string(j,:)
-     end
-     
-     if exist('r','var') == 1 && j <= r+(t_r/dt)
-%          if P_a_string(j,:) < P_sp_string(r,:).*(ramp*(j-r))
-%              realshit = 69
-%          else
-             P_sp_string(j,:) = P_current_store(1,:)+(ramp.*(j-r+1));
-%          end
-     end
-     
     % apply set points %
     system.gen(6:end,[2,9,10]) = [P_sp_string(j,1:Ntb).' P_sp_string(j,1:Ntb).' P_sp_string(j,1:Ntb).'];
     system.gen(2:5,[2,9,10]) = [P_sp_string(j,Ntb+1:end).' P_sp_string(j,Ntb+1:end).' P_sp_string(j,Ntb+1:end).'];
