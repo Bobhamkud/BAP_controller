@@ -29,3 +29,5 @@ demonstrator_control_code.m
 RPC_time_step.m
 
 test_demonstrator.m
+
+irradiance_profile.bmp
